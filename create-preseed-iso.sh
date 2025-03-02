@@ -34,7 +34,9 @@ make_bootable_iso() {
 		-map ./isolinux/ '/isolinux/' \
 		-map ./md5sum.txt '/md5sum.txt' \
 		-map ./install.amd/initrd.gz '/install.amd/initrd.gz' \
-		-boot_image isolinux dir=/isolinux \
+		-boot_image any replay \
+		-compliance no_emul_toc \
+		-padding included \
 		-outdev "$dest_iso_path"
 }
 
@@ -98,7 +100,7 @@ extract_iso() {
 
 	mkdir -p "${dest_dir}" || return
 
-	bsdtar --preserve-permissions --extract --file "${src_iso}" --directory "${dest_dir}"
+	xorriso -osirrox on -indev "$src_iso" -extract / "$dest_dir"
 }
 
 main() {
@@ -117,6 +119,13 @@ main() {
 
 	# Running these in subshells so any directory changes within functions don't affect eachother
 	(extract_iso "$SRC_ISO_PATH" "$tmp_iso_files_dir")
+
+	# from: https://wiki.debian.org/RepackBootableISO#In_xorriso_load_ISO_tree_and_write_modified_new_ISO
+	#    Work around a bug in xorriso <= 1.5.6 by preventing /isolinux/isolinux.bin from being 
+	#    brought back into the emerging ISO. The file /isolinux/isolinux.bin will then be 
+	#    copied correctly from "$orig_iso" to "$new_iso".
+	rm "${tmp_iso_files_dir}/isolinux/isolinux.bin"
+
 	(add_preseed "$tmp_iso_files_dir" "$PRESEED_FILE_PATH")
 	(edit_isolinux_config "$tmp_iso_files_dir")
 	(regenerate_md5sum "${tmp_iso_files_dir}")
